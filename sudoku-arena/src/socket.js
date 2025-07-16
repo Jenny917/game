@@ -1,6 +1,7 @@
+// src/socket.js
 import { io } from 'socket.io-client';
 
-// The URL of our backend server
-const URL = 'http://localhost:3001';
+// Use the production URL from Vercel, or fallback to localhost for development
+const URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3001';
 
 export const socket = io(URL);
