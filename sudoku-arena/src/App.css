@@ -164,13 +164,11 @@ body {
 }
 
 .pvp-lobby button {
-  /* FIX: Add reset styles to the lobby buttons */
   -webkit-appearance: none;
   appearance: none;
   background-color: #f0f0f0;
   color: #333;
   border: 1px solid var(--border-color);
-
   font-size: 1.1rem;
   padding: 0.5rem 1rem;
   cursor: pointer;
@@ -321,7 +319,8 @@ body {
   color: #333;
 }
 
-.copy-btn, .cancel-btn {
+/* FIX: Make this selector more specific */
+.pvp-lobby .copy-btn, .pvp-lobby .cancel-btn {
   font-size: 1rem;
   padding: 0.5rem 1rem;
   border-radius: 5px;
@@ -330,13 +329,15 @@ body {
   margin: 0 0.25rem;
 }
 
-.copy-btn {
+/* FIX: Make this selector more specific */
+.pvp-lobby .copy-btn {
   background-color: var(--button-bg);
   color: white;
   border-color: var(--button-bg);
 }
 
-.cancel-btn {
+/* FIX: Make this selector more specific */
+.pvp-lobby .cancel-btn {
   background-color: #ccc;
 }
 
