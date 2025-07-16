@@ -34,10 +34,11 @@ function App() {
   const [difficulty, setDifficulty] = useState('medium');
   const [time, setTime] = useState(0);
   const [isTimerRunning, setIsTimerRunning] = useState(false);
-  const [isGameActive, setIsGameActive] = useState(false); // NEW: Controls if the game board is visible
+  const [isGameActive, setIsGameActive] = useState(false);
 
   // PvP State
   const [gameMode, setGameMode] = useState('solo');
+  const [lobbyState, setLobbyState] = useState('default'); // NEW: 'default' or 'waiting'
   const [roomId, setRoomId] = useState('');
   const [joinRoomId, setJoinRoomId] = useState('');
   const [opponentPuzzle, setOpponentPuzzle] = useState([]);
@@ -46,41 +47,24 @@ function App() {
   // --- Game Logic Functions ---
   const startNewGame = useCallback(async (puzzleStr) => {
     let puzzleString = puzzleStr;
-    setIsTimerRunning(false);
-    setTime(0);
-
-    // Only show fetching message if a game isn't already being passed in (for PvP)
+    setIsTimerRunning(false); setTime(0);
     if (!puzzleString) {
       try {
         setGameMessage('Fetching new puzzle...');
         const response = await fetch(`${API_URL}/api/new-puzzle?difficulty=${difficulty}`);
-        const data = await response.json();
-        puzzleString = data.puzzle;
+        const data = await response.json(); puzzleString = data.puzzle;
       } catch (error) {
         console.error("Failed to fetch new puzzle:", error);
         setGameMessage('Could not fetch puzzle. Using a default puzzle.');
         puzzleString = "53..7....6..195....98....6.8...6...34..8.3..17...2...6.6....28....419..5....8..79";
       }
     }
-
     const initialGrid = puzzleString.split('').map(c => c === '.' ? null : Number(c));
     const currentGrid = [...initialGrid];
-    
-    setInitialPuzzle(initialGrid);
-    setPuzzle(currentGrid);
-    setSelectedCell(null);
-    setMistakes([]);
-    setHistory([currentGrid]);
-    setGameMessage('');
-    setIsTimerRunning(true);
-    setIsGameActive(true); // NEW: Set the game to active
+    setInitialPuzzle(initialGrid); setPuzzle(currentGrid); setSelectedCell(null); setMistakes([]); setHistory([currentGrid]); setGameMessage(''); setIsTimerRunning(true); setIsGameActive(true);
   }, [difficulty]);
 
-  const handleSelectDifficulty = (level) => {
-    setDifficulty(level);
-    setIsGameActive(false); // Return to the "pre-game" screen when difficulty changes
-  };
-
+  const handleSelectDifficulty = (level) => { setDifficulty(level); setIsGameActive(false); };
   const handleNumberInput = useCallback((number) => {
     if (selectedCell === null || initialPuzzle[selectedCell] !== null || gameMessage) return;
     const newPuzzle = [...puzzle]; newPuzzle[selectedCell] = number;
@@ -90,10 +74,10 @@ function App() {
     const isSolved = newPuzzle.every(cell => cell !== null);
     if (isSolved && newMistakes.length === 0) { const winMessage = gameMode === 'pvp-game' ? 'You Won!' : `Congratulations! Time: ${formatTime(time)}`; setGameMessage(winMessage); setIsTimerRunning(false); if (gameMode === 'pvp-game') socket.emit('gameOver', { roomId }); }
   }, [selectedCell, puzzle, initialPuzzle, gameMode, roomId, gameMessage, time]);
-
   const handleErase = useCallback(() => { if (selectedCell !== null && initialPuzzle[selectedCell] === null) handleNumberInput(null); }, [selectedCell, initialPuzzle, handleNumberInput]);
   const handleUndo = useCallback(() => { if (history.length > 1) { const newHistory = [...history]; newHistory.pop(); const lastState = newHistory[newHistory.length - 1]; setPuzzle(lastState); setHistory(newHistory); const newMistakes = []; for(let i = 0; i < 81; i++) { if(lastState[i] !== null && checkConflict(lastState, i, lastState[i])) newMistakes.push(i); } setMistakes(newMistakes); if(gameMode === 'pvp-game') socket.emit('playerMove', { roomId, puzzleState: lastState }); } }, [history, gameMode, roomId]);
-
+  
+  // --- PvP Logic ---
   const handleCreateRoom = async () => {
     try {
         setGameMessage('Fetching puzzle for new room...');
@@ -101,21 +85,24 @@ function App() {
         const data = await response.json(); const puzzleString = data.puzzle;
         const initialGrid = puzzleString.split('').map(c => c === '.' ? null : Number(c));
         socket.emit('createRoom', { puzzle: puzzleString, initialPuzzle: initialGrid });
-        setGameMessage('Creating room...');
+        setLobbyState('waiting'); // NEW: Change lobby view
     } catch (error) { alert("Could not create room. Failed to fetch a puzzle."); setGameMessage(''); }
   };
   const handleJoinRoom = () => { if (joinRoomId) socket.emit('joinRoom', { roomId: joinRoomId }); };
-  const handleLeaveMatch = () => { socket.emit('leaveRoom', { roomId }); setGameMode('pvp-lobby'); setRoomId(''); setGameMessage(''); setIsTimerRunning(false); };
+  const handleLeaveMatch = () => { socket.emit('leaveRoom', { roomId }); setGameMode('pvp-lobby'); setLobbyState('default'); setRoomId(''); setGameMessage(''); setIsTimerRunning(false); };
+  const handleCancelRoom = () => { setLobbyState('default'); setGameMessage(''); setRoomId(''); };
+  const handleCopyId = () => { navigator.clipboard.writeText(roomId); alert(`Room ID ${roomId} copied to clipboard!`); };
+  const handleModeChange = (mode) => { setGameMode(mode); setIsGameActive(false); setLobbyState('default'); setGameMessage(''); setRoomId(''); setIsTimerRunning(false); setTime(0); };
 
+  // --- UseEffect Hooks ---
   useEffect(() => {
-    let interval;
-    if (isTimerRunning) { interval = setInterval(() => { setTime(prevTime => prevTime + 1); }, 1000); }
+    let interval; if (isTimerRunning) { interval = setInterval(() => { setTime(prevTime => prevTime + 1); }, 1000); }
     return () => clearInterval(interval);
   }, [isTimerRunning]);
   
   useEffect(() => {
-    function onRoomCreated({ roomId }) { setRoomId(roomId); setGameMessage(`Room ${roomId} created. Waiting for opponent...`); }
-    function onGameStart({ puzzle, initialPuzzle, roomId }) { setRoomId(roomId); setOpponentPuzzle(initialPuzzle); startNewGame(puzzle); setGameMode('pvp-game'); }
+    function onRoomCreated({ roomId }) { setRoomId(roomId); setGameMessage(''); }
+    function onGameStart({ puzzle, initialPuzzle, roomId }) { setLobbyState('default'); setRoomId(roomId); setOpponentPuzzle(initialPuzzle); startNewGame(puzzle); setGameMode('pvp-game'); }
     function onOpponentMove(puzzleState) { setOpponentPuzzle(puzzleState); }
     function onOpponentWon() { setGameMessage('You Lost! Better luck next time.'); setIsTimerRunning(false); }
     function onOpponentLeft() { setGameMessage('Your opponent left the game.'); setIsTimerRunning(false); }
@@ -131,7 +118,7 @@ function App() {
   }, [selectedCell, handleNumberInput, handleErase, gameMessage, isGameActive]);
 
   const getCellClassName = (p, ip, sc, m, index) => { let c = 'cell'; if(ip[index]!==null) c+=' readonly'; if(sc===index) c+=' active'; if(m.includes(index)) c+=' error'; if(sc!==null){ const sr=Math.floor(sc/9), sc_c=sc%9, sb=Math.floor(sr/3)*3+Math.floor(sc_c/3), cr=Math.floor(index/9), cc=index%9, cb=Math.floor(cr/3)*3+Math.floor(cc/3); if(cr===sr||cc===sc_c||cb===sb) c+=' highlight'; } return c; };
-  const renderGrid = (p, ip, sc, m, clickHandler, isOpponent = false) => ( <div className="sudoku-grid">{p.map((val, idx) => { const cellValue = isOpponent ? null : val; const className = isOpponent ? `cell ${val !== null ? 'filled' : ''}` : getCellClassName(p, ip, sc, m, idx); return ( <div key={idx} className={className} onClick={clickHandler ? () => clickHandler(idx) : null}>{cellValue}</div>); })}</div> );
+  const renderGrid = (p, ip, sc, m, clickHandler, isOpponent = false) => ( <div className="sudoku-grid">{p && p.length > 0 && p.map((val, idx) => { const cellValue = isOpponent ? null : val; const className = isOpponent ? `cell ${val !== null ? 'filled' : ''}` : getCellClassName(p, ip, sc, m, idx); return ( <div key={idx} className={className} onClick={clickHandler ? () => clickHandler(idx) : null}>{cellValue}</div>); })}</div> );
 
   const difficultySelector = (
     <div className="difficulty-selector">
@@ -146,11 +133,13 @@ function App() {
       <div className="header">
         <h1>Sudoku Arena</h1>
         <div className="game-mode-selector">
-          <button onClick={() => { setGameMode('solo'); setIsGameActive(false); }} className={gameMode==='solo'?'active':''}>Solo</button>
-          <button onClick={() => { setGameMode('pvp-lobby'); setGameMessage(''); setRoomId(''); setIsTimerRunning(false);}} className={gameMode!=='solo'?'active':''}>PvP</button>
+          <button onClick={() => handleModeChange('solo')} className={gameMode==='solo'?'active':''}>Solo</button>
+          <button onClick={() => handleModeChange('pvp-lobby')} className={gameMode!=='solo'?'active':''}>PvP</button>
         </div>
       </div>
       
+      {gameMode !== 'pvp-lobby' && isGameActive && <div className="timer">{formatTime(time)}</div>}
+
       {gameMode === 'solo' && (
         <div className="game-area">
           {!isGameActive ? (
@@ -161,7 +150,6 @@ function App() {
             </div>
           ) : (
             <>
-              <div className="timer">{formatTime(time)}</div>
               {renderGrid(puzzle, initialPuzzle, selectedCell, mistakes, (idx) => setSelectedCell(idx))}
               <div className="controls">
                 <div className="numpad">{[1, 2, 3, 4, 5, 6, 7, 8, 9].map(num => <button key={num} onClick={() => handleNumberInput(num)}>{num}</button>)}</div>
@@ -174,19 +162,32 @@ function App() {
 
       {gameMode === 'pvp-lobby' && (
         <div className="pvp-lobby">
-          <h2>Player vs Player</h2>
-          {difficultySelector}
-          <button onClick={handleCreateRoom}>Create New Room</button>
-          <hr/>
-          <input type="text" placeholder="Enter Room ID" value={joinRoomId} onChange={e => setJoinRoomId(e.target.value)} />
-          <button onClick={handleJoinRoom}>Join Room</button>
+          {lobbyState === 'default' && (
+            <>
+              <h2>Player vs Player</h2>
+              {difficultySelector}
+              <button onClick={handleCreateRoom}>Create New Room</button>
+              <hr/>
+              <input type="text" placeholder="Enter Room ID" value={joinRoomId} onChange={e => setJoinRoomId(e.target.value)} />
+              <button onClick={handleJoinRoom}>Join Room</button>
+            </>
+          )}
+          {lobbyState === 'waiting' && (
+            <div className="waiting-room">
+                <h2>Room Created!</h2>
+                <p>Share this ID with a friend:</p>
+                <div className="room-id-display">{roomId}</div>
+                <button onClick={handleCopyId} className="copy-btn">Copy ID</button>
+                <p className="waiting-text">Waiting for opponent to join...</p>
+                <button onClick={handleCancelRoom} className="cancel-btn">Cancel</button>
+            </div>
+          )}
         </div>
       )}
       
       {gameMode === 'pvp-game' && (
         <div className="pvp-game-area">
           <div className="player-area">
-            <div className="timer">{formatTime(time)}</div>
             <h3>You (Room: {roomId})</h3>
             {renderGrid(puzzle, initialPuzzle, selectedCell, mistakes, (idx) => setSelectedCell(idx))}
             <div className="controls">

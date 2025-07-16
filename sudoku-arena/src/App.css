@@ -183,12 +183,27 @@ body {
 }
 
 .actions .leave-btn {
-  background-color: #f44336;
+  background-color: #f44336; /* A red color */
   border-color: #f44336;
 }
 
 .actions .leave-btn:hover {
   background-color: #d32f2f;
+}
+
+.timer {
+  font-size: 1.5rem;
+  font-weight: bold;
+  background-color: #fff;
+  padding: 0.5rem 1.5rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  font-family: 'Courier New', Courier, monospace;
+}
+
+.game-area .difficulty-selector,
+.pvp-lobby .difficulty-selector {
+  margin-bottom: 1rem;
 }
 
 .pre-game-screen {
@@ -218,36 +233,48 @@ body {
   background-color: var(--button-hover-bg);
 }
 
+/* Make timer have some space */
 .timer {
   margin-bottom: 1rem;
 }
 
-.game-area .difficulty-selector,
-.pvp-lobby .difficulty-selector {
-  margin-bottom: 1rem;
+.waiting-room {
+  text-align: center;
 }
 
-.difficulty-selector {
-  display: flex;
-  gap: 0.5rem;
-  background-color: #e0e0e0;
-  padding: 0.25rem;
+.room-id-display {
+  font-size: 2.5rem;
+  font-weight: bold;
+  font-family: 'Courier New', Courier, monospace;
+  background-color: #eee;
+  padding: 1rem 1.5rem;
   border-radius: 8px;
+  letter-spacing: 4px;
+  margin: 1rem 0;
+  color: #333;
 }
 
-.difficulty-selector button {
-  font-size: 0.9rem;
+.copy-btn, .cancel-btn {
+  font-size: 1rem;
   padding: 0.5rem 1rem;
-  border: none;
-  background-color: transparent;
-  border-radius: 6px;
+  border-radius: 5px;
   cursor: pointer;
-  font-weight: 500;
-  color: #333; /* <-- FIX: Explicitly set the text color */
+  border: 1px solid var(--border-color);
+  margin: 0 0.25rem;
 }
 
-.difficulty-selector button.active {
-  background-color: #fff;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-  color: var(--button-bg);
+.copy-btn {
+  background-color: var(--button-bg);
+  color: white;
+  border-color: var(--button-bg);
+}
+
+.cancel-btn {
+  background-color: #ccc;
+}
+
+.waiting-text {
+  margin-top: 1.5rem;
+  font-style: italic;
+  color: #777;
 }
