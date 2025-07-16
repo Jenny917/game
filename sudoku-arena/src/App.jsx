@@ -38,7 +38,7 @@ function App() {
 
   // PvP State
   const [gameMode, setGameMode] = useState('solo');
-  const [lobbyState, setLobbyState] = useState('default'); // NEW: 'default' or 'waiting'
+  const [lobbyState, setLobbyState] = useState('default');
   const [roomId, setRoomId] = useState('');
   const [joinRoomId, setJoinRoomId] = useState('');
   const [opponentPuzzle, setOpponentPuzzle] = useState([]);
@@ -85,7 +85,7 @@ function App() {
         const data = await response.json(); const puzzleString = data.puzzle;
         const initialGrid = puzzleString.split('').map(c => c === '.' ? null : Number(c));
         socket.emit('createRoom', { puzzle: puzzleString, initialPuzzle: initialGrid });
-        setLobbyState('waiting'); // NEW: Change lobby view
+        setLobbyState('waiting');
     } catch (error) { alert("Could not create room. Failed to fetch a puzzle."); setGameMessage(''); }
   };
   const handleJoinRoom = () => { if (joinRoomId) socket.emit('joinRoom', { roomId: joinRoomId }); };
@@ -166,10 +166,13 @@ function App() {
             <>
               <h2>Player vs Player</h2>
               {difficultySelector}
-              <button onClick={handleCreateRoom}>Create New Room</button>
+              <button onClick={handleCreateRoom} className="create-room-btn">Create New Room</button>
               <hr/>
-              <input type="text" placeholder="Enter Room ID" value={joinRoomId} onChange={e => setJoinRoomId(e.target.value)} />
-              <button onClick={handleJoinRoom}>Join Room</button>
+              {/* FIX: Wrap the join form in a div */}
+              <div className="join-room-form">
+                <input type="text" placeholder="Enter Room ID" value={joinRoomId} onChange={e => setJoinRoomId(e.target.value)} />
+                <button onClick={handleJoinRoom}>Join Room</button>
+              </div>
             </>
           )}
           {lobbyState === 'waiting' && (

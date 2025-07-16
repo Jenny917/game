@@ -113,11 +113,9 @@ body {
 }
 
 .numpad button, .actions button {
-  /* FIX #1: Add appearance: none and a default color */
   -webkit-appearance: none;
   appearance: none;
   color: #333;
-  
   font-size: 1.2rem;
   font-weight: bold;
   padding: 0.75rem;
@@ -145,7 +143,12 @@ body {
 }
 
 .pvp-lobby {
-  text-align: center;
+  /* FIX: Use flexbox for alignment */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+
   background-color: #fff;
   padding: 2rem;
   border-radius: 8px;
@@ -153,18 +156,38 @@ body {
 }
 
 .pvp-lobby input {
-  /* FIX #2: Explicitly set background and color for the text input */
   background-color: #fff;
   color: #333;
-
   font-size: 1.1rem;
   padding: 0.5rem;
   margin: 0 0.5rem;
   border: 2px solid var(--border-color);
   border-radius: 5px;
 }
-.pvp-lobby button { font-size: 1.1rem; padding: 0.5rem 1rem; }
-.pvp-lobby hr { border: none; border-top: 1px solid #eee; margin: 1.5rem 0; }
+
+.pvp-lobby button {
+  font-size: 1.1rem;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+}
+
+.pvp-lobby .create-room-btn {
+    padding: 0.75rem 1.5rem;
+    font-weight: bold;
+}
+
+.pvp-lobby hr {
+  border: none;
+  border-top: 1px solid #eee;
+  width: 100%;
+  margin: 0; /* Remove margin as gap is now handled by flexbox */
+}
+
+/* FIX: New style for the join form */
+.join-room-form {
+    display: flex;
+    align-items: center;
+}
 
 .pvp-game-area {
   display: flex;
