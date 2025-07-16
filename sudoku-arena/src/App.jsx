@@ -127,14 +127,22 @@ function App() {
   return (
     <div className="app-container">
       <div className="header">
-        <h1>Sudoku</h1>
+        <h1>Sudoku Arena</h1>
         <div className="game-mode-selector">
           <button onClick={() => { setGameMode('solo'); startNewGame(); }} className={gameMode==='solo'?'active':''}>Solo</button>
           <button onClick={() => { setGameMode('pvp-lobby'); setGameMessage(''); setRoomId(''); }} className={gameMode!=='solo'?'active':''}>PvP</button>
         </div>
       </div>
 
-      {gameMode === 'solo' && ( <div className="game-area">{renderGrid(puzzle, initialPuzzle, selectedCell, mistakes, (idx) => setSelectedCell(idx))}</div> )}
+      {gameMode === 'solo' && (
+        <div className="game-area">
+          {renderGrid(puzzle, initialPuzzle, selectedCell, mistakes, (idx) => setSelectedCell(idx))}
+          <div className="controls">
+            <div className="numpad">{[1, 2, 3, 4, 5, 6, 7, 8, 9].map(num => <button key={num} onClick={() => handleNumberInput(num)}>{num}</button>)}</div>
+            <div className="actions"><button onClick={handleUndo}>Undo</button><button onClick={handleErase}>Erase</button><button onClick={startNewGame}>New Game</button></div>
+          </div>
+        </div>
+      )}
 
       {gameMode === 'pvp-lobby' && (
         <div className="pvp-lobby">
@@ -148,18 +156,21 @@ function App() {
       
       {gameMode === 'pvp-game' && (
         <div className="pvp-game-area">
-          <div className="player-grid"><h3>You (Room: {roomId})</h3>{renderGrid(puzzle, initialPuzzle, selectedCell, mistakes, (idx) => setSelectedCell(idx))}</div>
-          <div className="opponent-grid"><h3>Opponent</h3>{renderGrid(opponentPuzzle, initialPuzzle, null, [], null, true)}</div>
+          {/* Main player's grid and controls are now grouped together */}
+          <div className="player-area">
+            <h3>You (Room: {roomId})</h3>
+            {renderGrid(puzzle, initialPuzzle, selectedCell, mistakes, (idx) => setSelectedCell(idx))}
+            <div className="controls">
+                <div className="numpad">{[1, 2, 3, 4, 5, 6, 7, 8, 9].map(num => <button key={num} onClick={() => handleNumberInput(num)}>{num}</button>)}</div>
+                <div className="actions"><button onClick={handleUndo}>Undo</button><button onClick={handleErase}>Erase</button></div>
+            </div>
+          </div>
+          <div className="opponent-grid">
+            <h3>Opponent</h3>
+            {renderGrid(opponentPuzzle, initialPuzzle, null, [], null, true)}
+          </div>
         </div>
       )}
-
-      {(gameMode !== 'pvp-lobby') && (
-        <div className="controls">
-          <div className="numpad">{[1, 2, 3, 4, 5, 6, 7, 8, 9].map(num => <button key={num} onClick={() => handleNumberInput(num)}>{num}</button>)}</div>
-          <div className="actions"><button onClick={handleUndo}>Undo</button><button onClick={handleErase}>Erase</button><button onClick={startNewGame}>New Game</button></div>
-        </div>
-      )}
-
       <p className="game-message">{gameMessage}</p>
     </div>
   );

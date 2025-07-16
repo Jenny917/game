@@ -57,7 +57,7 @@ body {
   background-color: #fff;
 }
 
-.game-area {
+.game-area, .player-area {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -160,7 +160,7 @@ body {
   width: 100%;
 }
 
-.player-grid, .opponent-grid {
+.opponent-grid {
   display: flex;
   flex-direction: column;
   align-items: center;
