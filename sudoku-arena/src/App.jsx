@@ -7,22 +7,10 @@ const checkConflict = (grid, index, value) => {
   if (value === null) return false;
   const row = Math.floor(index / 9);
   const col = index % 9;
-
-  for (let i = 0; i < 9; i++) {
-    const rowIndex = row * 9 + i;
-    const colIndex = i * 9 + col;
-    if (grid[rowIndex] === value && rowIndex !== index) return true;
-    if (grid[colIndex] === value && colIndex !== index) return true;
-  }
-
+  for (let i = 0; i < 9; i++) { const rowIndex = row * 9 + i; const colIndex = i * 9 + col; if (grid[rowIndex] === value && rowIndex !== index) return true; if (grid[colIndex] === value && colIndex !== index) return true; }
   const startRow = Math.floor(row / 3) * 3;
   const startCol = Math.floor(col / 3) * 3;
-  for (let i = 0; i < 3; i++) {
-    for (let j = 0; j < 3; j++) {
-      const subGridIndex = (startRow + i) * 9 + (startCol + j);
-      if (grid[subGridIndex] === value && subGridIndex !== index) return true;
-    }
-  }
+  for (let i = 0; i < 3; i++) { for (let j = 0; j < 3; j++) { const subGridIndex = (startRow + i) * 9 + (startCol + j); if (grid[subGridIndex] === value && subGridIndex !== index) return true; } }
   return false;
 };
 
@@ -46,6 +34,7 @@ function App() {
   const [difficulty, setDifficulty] = useState('medium');
   const [time, setTime] = useState(0);
   const [isTimerRunning, setIsTimerRunning] = useState(false);
+  const [isGameActive, setIsGameActive] = useState(false); // NEW: Controls if the game board is visible
 
   // PvP State
   const [gameMode, setGameMode] = useState('solo');
@@ -60,6 +49,7 @@ function App() {
     setIsTimerRunning(false);
     setTime(0);
 
+    // Only show fetching message if a game isn't already being passed in (for PvP)
     if (!puzzleString) {
       try {
         setGameMessage('Fetching new puzzle...');
@@ -83,7 +73,13 @@ function App() {
     setHistory([currentGrid]);
     setGameMessage('');
     setIsTimerRunning(true);
+    setIsGameActive(true); // NEW: Set the game to active
   }, [difficulty]);
+
+  const handleSelectDifficulty = (level) => {
+    setDifficulty(level);
+    setIsGameActive(false); // Return to the "pre-game" screen when difficulty changes
+  };
 
   const handleNumberInput = useCallback((number) => {
     if (selectedCell === null || initialPuzzle[selectedCell] !== null || gameMessage) return;
@@ -92,12 +88,7 @@ function App() {
     setPuzzle(newPuzzle); setMistakes(newMistakes); setHistory(prev => [...prev, newPuzzle]);
     if (gameMode === 'pvp-game') { socket.emit('playerMove', { roomId, puzzleState: newPuzzle }); }
     const isSolved = newPuzzle.every(cell => cell !== null);
-    if (isSolved && newMistakes.length === 0) {
-      const winMessage = gameMode === 'pvp-game' ? 'You Won!' : `Congratulations! Time: ${formatTime(time)}`;
-      setGameMessage(winMessage);
-      setIsTimerRunning(false);
-      if (gameMode === 'pvp-game') socket.emit('gameOver', { roomId });
-    }
+    if (isSolved && newMistakes.length === 0) { const winMessage = gameMode === 'pvp-game' ? 'You Won!' : `Congratulations! Time: ${formatTime(time)}`; setGameMessage(winMessage); setIsTimerRunning(false); if (gameMode === 'pvp-game') socket.emit('gameOver', { roomId }); }
   }, [selectedCell, puzzle, initialPuzzle, gameMode, roomId, gameMessage, time]);
 
   const handleErase = useCallback(() => { if (selectedCell !== null && initialPuzzle[selectedCell] === null) handleNumberInput(null); }, [selectedCell, initialPuzzle, handleNumberInput]);
@@ -116,16 +107,9 @@ function App() {
   const handleJoinRoom = () => { if (joinRoomId) socket.emit('joinRoom', { roomId: joinRoomId }); };
   const handleLeaveMatch = () => { socket.emit('leaveRoom', { roomId }); setGameMode('pvp-lobby'); setRoomId(''); setGameMessage(''); setIsTimerRunning(false); };
 
-  // --- UseEffect Hooks ---
-  useEffect(() => { startNewGame(); }, [startNewGame]);
-
   useEffect(() => {
     let interval;
-    if (isTimerRunning) {
-      interval = setInterval(() => {
-        setTime(prevTime => prevTime + 1);
-      }, 1000);
-    }
+    if (isTimerRunning) { interval = setInterval(() => { setTime(prevTime => prevTime + 1); }, 1000); }
     return () => clearInterval(interval);
   }, [isTimerRunning]);
   
@@ -141,19 +125,19 @@ function App() {
   }, [startNewGame]);
 
   useEffect(() => {
-    const handleKeyPress = (e) => { if (selectedCell === null || gameMessage) return; if (/^[1-9]$/.test(e.key)) handleNumberInput(Number(e.key)); else if (e.key === 'Backspace' || e.key === 'Delete') handleErase(); };
+    const handleKeyPress = (e) => { if (selectedCell === null || gameMessage || !isGameActive) return; if (/^[1-9]$/.test(e.key)) handleNumberInput(Number(e.key)); else if (e.key === 'Backspace' || e.key === 'Delete') handleErase(); };
     window.addEventListener('keydown', handleKeyPress);
     return () => window.removeEventListener('keydown', handleKeyPress);
-  }, [selectedCell, handleNumberInput, handleErase, gameMessage]);
+  }, [selectedCell, handleNumberInput, handleErase, gameMessage, isGameActive]);
 
   const getCellClassName = (p, ip, sc, m, index) => { let c = 'cell'; if(ip[index]!==null) c+=' readonly'; if(sc===index) c+=' active'; if(m.includes(index)) c+=' error'; if(sc!==null){ const sr=Math.floor(sc/9), sc_c=sc%9, sb=Math.floor(sr/3)*3+Math.floor(sc_c/3), cr=Math.floor(index/9), cc=index%9, cb=Math.floor(cr/3)*3+Math.floor(cc/3); if(cr===sr||cc===sc_c||cb===sb) c+=' highlight'; } return c; };
   const renderGrid = (p, ip, sc, m, clickHandler, isOpponent = false) => ( <div className="sudoku-grid">{p.map((val, idx) => { const cellValue = isOpponent ? null : val; const className = isOpponent ? `cell ${val !== null ? 'filled' : ''}` : getCellClassName(p, ip, sc, m, idx); return ( <div key={idx} className={className} onClick={clickHandler ? () => clickHandler(idx) : null}>{cellValue}</div>); })}</div> );
 
   const difficultySelector = (
     <div className="difficulty-selector">
-      <button onClick={() => setDifficulty('easy')} className={difficulty==='easy'?'active':''}>Easy</button>
-      <button onClick={() => setDifficulty('medium')} className={difficulty==='medium'?'active':''}>Medium</button>
-      <button onClick={() => setDifficulty('hard')} className={difficulty==='hard'?'active':''}>Hard</button>
+      <button onClick={() => handleSelectDifficulty('easy')} className={difficulty==='easy'?'active':''}>Easy</button>
+      <button onClick={() => handleSelectDifficulty('medium')} className={difficulty==='medium'?'active':''}>Medium</button>
+      <button onClick={() => handleSelectDifficulty('hard')} className={difficulty==='hard'?'active':''}>Hard</button>
     </div>
   );
 
@@ -162,28 +146,36 @@ function App() {
       <div className="header">
         <h1>Sudoku Arena</h1>
         <div className="game-mode-selector">
-          <button onClick={() => { setGameMode('solo'); startNewGame(); }} className={gameMode==='solo'?'active':''}>Solo</button>
-          <button onClick={() => { setGameMode('pvp-lobby'); setGameMessage(''); setRoomId(''); setIsTimerRunning(false); setTime(0);}} className={gameMode!=='solo'?'active':''}>PvP</button>
+          <button onClick={() => { setGameMode('solo'); setIsGameActive(false); }} className={gameMode==='solo'?'active':''}>Solo</button>
+          <button onClick={() => { setGameMode('pvp-lobby'); setGameMessage(''); setRoomId(''); setIsTimerRunning(false);}} className={gameMode!=='solo'?'active':''}>PvP</button>
         </div>
       </div>
       
-      {gameMode !== 'pvp-lobby' && <div className="timer">{formatTime(time)}</div>}
-
       {gameMode === 'solo' && (
         <div className="game-area">
-          {difficultySelector} {/* Moved selector here */}
-          {renderGrid(puzzle, initialPuzzle, selectedCell, mistakes, (idx) => setSelectedCell(idx))}
-          <div className="controls">
-            <div className="numpad">{[1, 2, 3, 4, 5, 6, 7, 8, 9].map(num => <button key={num} onClick={() => handleNumberInput(num)}>{num}</button>)}</div>
-            <div className="actions"><button onClick={handleUndo}>Undo</button><button onClick={handleErase}>Erase</button><button onClick={() => startNewGame()}>New Game</button></div>
-          </div>
+          {!isGameActive ? (
+            <div className="pre-game-screen">
+              <h2>Select Difficulty</h2>
+              {difficultySelector}
+              <button className="start-btn" onClick={() => startNewGame()}>Start Game</button>
+            </div>
+          ) : (
+            <>
+              <div className="timer">{formatTime(time)}</div>
+              {renderGrid(puzzle, initialPuzzle, selectedCell, mistakes, (idx) => setSelectedCell(idx))}
+              <div className="controls">
+                <div className="numpad">{[1, 2, 3, 4, 5, 6, 7, 8, 9].map(num => <button key={num} onClick={() => handleNumberInput(num)}>{num}</button>)}</div>
+                <div className="actions"><button onClick={handleUndo}>Undo</button><button onClick={handleErase}>Erase</button><button onClick={() => setIsGameActive(false)}>New Game</button></div>
+              </div>
+            </>
+          )}
         </div>
       )}
 
       {gameMode === 'pvp-lobby' && (
         <div className="pvp-lobby">
           <h2>Player vs Player</h2>
-          {difficultySelector} {/* Moved selector here */}
+          {difficultySelector}
           <button onClick={handleCreateRoom}>Create New Room</button>
           <hr/>
           <input type="text" placeholder="Enter Room ID" value={joinRoomId} onChange={e => setJoinRoomId(e.target.value)} />
@@ -194,6 +186,7 @@ function App() {
       {gameMode === 'pvp-game' && (
         <div className="pvp-game-area">
           <div className="player-area">
+            <div className="timer">{formatTime(time)}</div>
             <h3>You (Room: {roomId})</h3>
             {renderGrid(puzzle, initialPuzzle, selectedCell, mistakes, (idx) => setSelectedCell(idx))}
             <div className="controls">
