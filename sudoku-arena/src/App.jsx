@@ -155,7 +155,7 @@ function App() {
   return (
     <div className="app-container">
       <div className="header">
-        <h1>Sudoku Arena</h1>
+        <h1>Sudoku</h1>
         <div className="game-mode-selector">
           <button onClick={() => { setGameMode('solo'); startNewGame(); }} className={gameMode==='solo'?'active':''}>Solo</button>
           <button onClick={() => { setGameMode('pvp-lobby'); setGameMessage(''); setRoomId(''); }} className={gameMode!=='solo'?'active':''}>PvP</button>
