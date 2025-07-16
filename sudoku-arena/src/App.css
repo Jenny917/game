@@ -143,12 +143,10 @@ body {
 }
 
 .pvp-lobby {
-  /* FIX: Use flexbox for alignment */
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 1rem;
-
   background-color: #fff;
   padding: 2rem;
   border-radius: 8px;
@@ -166,24 +164,34 @@ body {
 }
 
 .pvp-lobby button {
+  /* FIX: Add reset styles to the lobby buttons */
+  -webkit-appearance: none;
+  appearance: none;
+  background-color: #f0f0f0;
+  color: #333;
+  border: 1px solid var(--border-color);
+
   font-size: 1.1rem;
   padding: 0.5rem 1rem;
   cursor: pointer;
+  border-radius: 5px;
 }
 
 .pvp-lobby .create-room-btn {
     padding: 0.75rem 1.5rem;
     font-weight: bold;
+    background-color: var(--button-bg);
+    color: white;
+    border-color: var(--button-bg);
 }
 
 .pvp-lobby hr {
   border: none;
   border-top: 1px solid #eee;
   width: 100%;
-  margin: 0; /* Remove margin as gap is now handled by flexbox */
+  margin: 0;
 }
 
-/* FIX: New style for the join form */
 .join-room-form {
     display: flex;
     align-items: center;
