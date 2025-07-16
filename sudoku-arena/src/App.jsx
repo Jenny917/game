@@ -26,7 +26,6 @@ const checkConflict = (grid, index, value) => {
   return false;
 };
 
-// Use the environment variable for your deployed backend, or localhost for local dev
 const API_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3001';
 
 
@@ -53,13 +52,12 @@ function App() {
     if (!puzzleString) {
       try {
         setGameMessage('Fetching new puzzle...');
-        const response = await fetch(`${API_URL}/api/new-puzzle`); // Use our own API
+        const response = await fetch(`${API_URL}/api/new-puzzle`);
         const data = await response.json();
         puzzleString = data.puzzle;
       } catch (error) {
         console.error("Failed to fetch new puzzle:", error);
         setGameMessage('Could not fetch puzzle. Using a default puzzle.');
-        // Fallback to a default puzzle in case of API error
         puzzleString = "53..7....6..195....98....6.8...6...34..8.3..17...2...6.6....28....419..5....8..79";
       }
     }
@@ -99,7 +97,7 @@ function App() {
   const handleCreateRoom = async () => {
     try {
         setGameMessage('Fetching puzzle for new room...');
-        const response = await fetch(`${API_URL}/api/new-puzzle`); // Use our own API
+        const response = await fetch(`${API_URL}/api/new-puzzle`);
         const data = await response.json();
         const puzzleString = data.puzzle;
         const initialGrid = puzzleString.split('').map(c => c === '.' ? null : Number(c));
@@ -112,6 +110,14 @@ function App() {
     }
   };
   const handleJoinRoom = () => { if (joinRoomId) socket.emit('joinRoom', { roomId: joinRoomId }); };
+  
+  // --- NEW: Function to leave a PvP match ---
+  const handleLeaveMatch = () => {
+    socket.emit('leaveRoom', { roomId });
+    setGameMode('pvp-lobby');
+    setRoomId('');
+    setGameMessage('');
+  };
 
   useEffect(() => { startNewGame(); }, [startNewGame]);
 
@@ -183,7 +189,12 @@ function App() {
             {renderGrid(puzzle, initialPuzzle, selectedCell, mistakes, (idx) => setSelectedCell(idx))}
             <div className="controls">
                 <div className="numpad">{[1, 2, 3, 4, 5, 6, 7, 8, 9].map(num => <button key={num} onClick={() => handleNumberInput(num)}>{num}</button>)}</div>
-                <div className="actions"><button onClick={handleUndo}>Undo</button><button onClick={handleErase}>Erase</button></div>
+                {/* --- NEW: Actions menu for PvP --- */}
+                <div className="actions">
+                    <button onClick={handleUndo}>Undo</button>
+                    <button onClick={handleErase}>Erase</button>
+                    <button onClick={handleLeaveMatch} className="leave-btn">Leave Match</button>
+                </div>
             </div>
           </div>
           <div className="opponent-grid">

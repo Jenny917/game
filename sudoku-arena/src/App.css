@@ -181,3 +181,12 @@ body {
 .opponent-grid .cell.filled {
   background-color: #e0e0e0;
 }
+
+.actions .leave-btn {
+  background-color: #f44336; /* A red color */
+  border-color: #f44336;
+}
+
+.actions .leave-btn:hover {
+  background-color: #d32f2f;
+}
