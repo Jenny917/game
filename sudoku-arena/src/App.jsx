@@ -3,12 +3,6 @@ import { socket } from './socket';
 import './App.css';
 
 // --- Helper Functions & Constants ---
-const puzzles = [
-  "53..7....6..195....98....6.8...6...34..8.3..17...2...6.6....28....419..5....8..79",
-  "..9748...7.........2.1.9.....7...24..64.1.59..98...3.....8.3.2.........6...2759..",
-  "4.....8.5.3..........7......2.....6.....8.4......1.......6.3.7.5..2.....1.4......",
-];
-
 const checkConflict = (grid, index, value) => {
   if (value === null) return false;
   const row = Math.floor(index / 9);
@@ -32,6 +26,9 @@ const checkConflict = (grid, index, value) => {
   return false;
 };
 
+// Use the environment variable for your deployed backend, or localhost for local dev
+const API_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3001';
+
 
 // --- The Main App Component ---
 function App() {
@@ -43,17 +40,33 @@ function App() {
   const [history, setHistory] = useState([]);
 
   // PvP State
-  const [gameMode, setGameMode] = useState('solo'); // 'solo', 'pvp-lobby', 'pvp-game'
+  const [gameMode, setGameMode] = useState('solo');
   const [roomId, setRoomId] = useState('');
   const [joinRoomId, setJoinRoomId] = useState('');
   const [opponentPuzzle, setOpponentPuzzle] = useState([]);
   const [gameMessage, setGameMessage] = useState('');
 
-  // --- Game Logic Functions (Solo & PvP) ---
-  const startNewGame = useCallback((puzzleStr) => {
-    const puzzleString = puzzleStr || puzzles[Math.floor(Math.random() * puzzles.length)];
+  // --- Game Logic Functions ---
+  const startNewGame = useCallback(async (puzzleStr) => {
+    let puzzleString = puzzleStr;
+
+    if (!puzzleString) {
+      try {
+        setGameMessage('Fetching new puzzle...');
+        const response = await fetch(`${API_URL}/api/new-puzzle`); // Use our own API
+        const data = await response.json();
+        puzzleString = data.puzzle;
+      } catch (error) {
+        console.error("Failed to fetch new puzzle:", error);
+        setGameMessage('Could not fetch puzzle. Using a default puzzle.');
+        // Fallback to a default puzzle in case of API error
+        puzzleString = "53..7....6..195....98....6.8...6...34..8.3..17...2...6.6....28....419..5....8..79";
+      }
+    }
+
     const initialGrid = puzzleString.split('').map(c => c === '.' ? null : Number(c));
     const currentGrid = [...initialGrid];
+    
     setInitialPuzzle(initialGrid);
     setPuzzle(currentGrid);
     setSelectedCell(null);
@@ -83,11 +96,20 @@ function App() {
   const handleErase = useCallback(() => { if (selectedCell !== null && initialPuzzle[selectedCell] === null) handleNumberInput(null); }, [selectedCell, initialPuzzle, handleNumberInput]);
   const handleUndo = useCallback(() => { if (history.length > 1) { const newHistory = [...history]; newHistory.pop(); const lastState = newHistory[newHistory.length - 1]; setPuzzle(lastState); setHistory(newHistory); const newMistakes = []; for(let i = 0; i < 81; i++) { if(lastState[i] !== null && checkConflict(lastState, i, lastState[i])) newMistakes.push(i); } setMistakes(newMistakes); if(gameMode === 'pvp-game') socket.emit('playerMove', { roomId, puzzleState: lastState }); } }, [history, gameMode, roomId]);
 
-  const handleCreateRoom = () => {
-    const puzzleString = puzzles[Math.floor(Math.random() * puzzles.length)];
-    const initialGrid = puzzleString.split('').map(c => c === '.' ? null : Number(c));
-    socket.emit('createRoom', { puzzle: puzzleString, initialPuzzle: initialGrid });
-    setGameMessage('Creating room...');
+  const handleCreateRoom = async () => {
+    try {
+        setGameMessage('Fetching puzzle for new room...');
+        const response = await fetch(`${API_URL}/api/new-puzzle`); // Use our own API
+        const data = await response.json();
+        const puzzleString = data.puzzle;
+        const initialGrid = puzzleString.split('').map(c => c === '.' ? null : Number(c));
+
+        socket.emit('createRoom', { puzzle: puzzleString, initialPuzzle: initialGrid });
+        setGameMessage('Creating room...');
+    } catch (error) {
+        alert("Could not create room. Failed to fetch a puzzle.");
+        setGameMessage('');
+    }
   };
   const handleJoinRoom = () => { if (joinRoomId) socket.emit('joinRoom', { roomId: joinRoomId }); };
 
@@ -139,7 +161,7 @@ function App() {
           {renderGrid(puzzle, initialPuzzle, selectedCell, mistakes, (idx) => setSelectedCell(idx))}
           <div className="controls">
             <div className="numpad">{[1, 2, 3, 4, 5, 6, 7, 8, 9].map(num => <button key={num} onClick={() => handleNumberInput(num)}>{num}</button>)}</div>
-            <div className="actions"><button onClick={handleUndo}>Undo</button><button onClick={handleErase}>Erase</button><button onClick={startNewGame}>New Game</button></div>
+            <div className="actions"><button onClick={handleUndo}>Undo</button><button onClick={handleErase}>Erase</button><button onClick={() => startNewGame()}>New Game</button></div>
           </div>
         </div>
       )}
@@ -156,7 +178,6 @@ function App() {
       
       {gameMode === 'pvp-game' && (
         <div className="pvp-game-area">
-          {/* Main player's grid and controls are now grouped together */}
           <div className="player-area">
             <h3>You (Room: {roomId})</h3>
             {renderGrid(puzzle, initialPuzzle, selectedCell, mistakes, (idx) => setSelectedCell(idx))}

@@ -2,21 +2,34 @@
 const express = require('express');
 const http = require('http');
 const { Server } = require("socket.io");
+const sudoku = require('sudoku'); // <-- IMPORT THE NEW PACKAGE
 
 const app = express();
 const server = http.createServer(app);
 
-// --- CORRECTED Socket.IO CONFIGURATION ---
 const io = new Server(server, {
   cors: {
-    origin: "*", // Allows your frontend to connect
+    origin: "*",
     methods: ["GET", "POST"]
   },
-  // Add these options to handle connection health checks for Render
-  pingInterval: 20000, // Sends a ping every 20 seconds
-  pingTimeout: 5000,   // Waits 5 seconds for a pong response before closing
+  pingInterval: 20000,
+  pingTimeout: 5000,
 });
-// -----------------------------------------
+
+
+// --- NEW API ENDPOINT FOR PUZZLES ---
+app.get('/api/new-puzzle', (req, res) => {
+  // Generate a puzzle. The result is an array of 81 numbers (0-8, or null for empty).
+  const puzzle = sudoku.makepuzzle();
+  
+  // Convert the array into the string format our frontend expects (1-9, '.' for empty).
+  // The library uses 0-8 for numbers, so we add 1. It uses null for empty cells.
+  const puzzleString = puzzle.map(num => (num === null ? '.' : num + 1)).join('');
+  
+  console.log('🧩 New puzzle generated and sent.');
+  res.json({ puzzle: puzzleString });
+});
+// ------------------------------------
 
 
 // --- Game State Management ---
