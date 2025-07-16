@@ -190,3 +190,18 @@ body {
 .actions .leave-btn:hover {
   background-color: #d32f2f;
 }
+
+.timer {
+  font-size: 1.5rem;
+  font-weight: bold;
+  background-color: #fff;
+  padding: 0.5rem 1.5rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  font-family: 'Courier New', Courier, monospace;
+}
+
+.game-area .difficulty-selector,
+.pvp-lobby .difficulty-selector {
+  margin-bottom: 1rem;
+}

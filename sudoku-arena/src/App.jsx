@@ -26,6 +26,12 @@ const checkConflict = (grid, index, value) => {
   return false;
 };
 
+const formatTime = (seconds) => {
+  const minutes = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return `${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+};
+
 const API_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3001';
 
 
@@ -37,6 +43,9 @@ function App() {
   const [selectedCell, setSelectedCell] = useState(null);
   const [mistakes, setMistakes] = useState([]);
   const [history, setHistory] = useState([]);
+  const [difficulty, setDifficulty] = useState('medium');
+  const [time, setTime] = useState(0);
+  const [isTimerRunning, setIsTimerRunning] = useState(false);
 
   // PvP State
   const [gameMode, setGameMode] = useState('solo');
@@ -48,11 +57,13 @@ function App() {
   // --- Game Logic Functions ---
   const startNewGame = useCallback(async (puzzleStr) => {
     let puzzleString = puzzleStr;
+    setIsTimerRunning(false);
+    setTime(0);
 
     if (!puzzleString) {
       try {
         setGameMessage('Fetching new puzzle...');
-        const response = await fetch(`${API_URL}/api/new-puzzle`);
+        const response = await fetch(`${API_URL}/api/new-puzzle?difficulty=${difficulty}`);
         const data = await response.json();
         puzzleString = data.puzzle;
       } catch (error) {
@@ -71,25 +82,23 @@ function App() {
     setMistakes([]);
     setHistory([currentGrid]);
     setGameMessage('');
-  }, []);
+    setIsTimerRunning(true);
+  }, [difficulty]);
 
   const handleNumberInput = useCallback((number) => {
     if (selectedCell === null || initialPuzzle[selectedCell] !== null || gameMessage) return;
-    const newPuzzle = [...puzzle];
-    newPuzzle[selectedCell] = number;
-    const newMistakes = [];
-    for(let i = 0; i < 81; i++) { if(newPuzzle[i] !== null && checkConflict(newPuzzle, i, newPuzzle[i])) newMistakes.push(i); }
-    setPuzzle(newPuzzle);
-    setMistakes(newMistakes);
-    setHistory(prev => [...prev, newPuzzle]);
+    const newPuzzle = [...puzzle]; newPuzzle[selectedCell] = number;
+    const newMistakes = []; for(let i = 0; i < 81; i++) { if(newPuzzle[i] !== null && checkConflict(newPuzzle, i, newPuzzle[i])) newMistakes.push(i); }
+    setPuzzle(newPuzzle); setMistakes(newMistakes); setHistory(prev => [...prev, newPuzzle]);
     if (gameMode === 'pvp-game') { socket.emit('playerMove', { roomId, puzzleState: newPuzzle }); }
     const isSolved = newPuzzle.every(cell => cell !== null);
     if (isSolved && newMistakes.length === 0) {
-      const winMessage = gameMode === 'pvp-game' ? 'You Won!' : 'Congratulations!';
+      const winMessage = gameMode === 'pvp-game' ? 'You Won!' : `Congratulations! Time: ${formatTime(time)}`;
       setGameMessage(winMessage);
+      setIsTimerRunning(false);
       if (gameMode === 'pvp-game') socket.emit('gameOver', { roomId });
     }
-  }, [selectedCell, puzzle, initialPuzzle, gameMode, roomId, gameMessage]);
+  }, [selectedCell, puzzle, initialPuzzle, gameMode, roomId, gameMessage, time]);
 
   const handleErase = useCallback(() => { if (selectedCell !== null && initialPuzzle[selectedCell] === null) handleNumberInput(null); }, [selectedCell, initialPuzzle, handleNumberInput]);
   const handleUndo = useCallback(() => { if (history.length > 1) { const newHistory = [...history]; newHistory.pop(); const lastState = newHistory[newHistory.length - 1]; setPuzzle(lastState); setHistory(newHistory); const newMistakes = []; for(let i = 0; i < 81; i++) { if(lastState[i] !== null && checkConflict(lastState, i, lastState[i])) newMistakes.push(i); } setMistakes(newMistakes); if(gameMode === 'pvp-game') socket.emit('playerMove', { roomId, puzzleState: lastState }); } }, [history, gameMode, roomId]);
@@ -97,36 +106,35 @@ function App() {
   const handleCreateRoom = async () => {
     try {
         setGameMessage('Fetching puzzle for new room...');
-        const response = await fetch(`${API_URL}/api/new-puzzle`);
-        const data = await response.json();
-        const puzzleString = data.puzzle;
+        const response = await fetch(`${API_URL}/api/new-puzzle?difficulty=${difficulty}`);
+        const data = await response.json(); const puzzleString = data.puzzle;
         const initialGrid = puzzleString.split('').map(c => c === '.' ? null : Number(c));
-
         socket.emit('createRoom', { puzzle: puzzleString, initialPuzzle: initialGrid });
         setGameMessage('Creating room...');
-    } catch (error) {
-        alert("Could not create room. Failed to fetch a puzzle.");
-        setGameMessage('');
-    }
+    } catch (error) { alert("Could not create room. Failed to fetch a puzzle."); setGameMessage(''); }
   };
   const handleJoinRoom = () => { if (joinRoomId) socket.emit('joinRoom', { roomId: joinRoomId }); };
-  
-  // --- NEW: Function to leave a PvP match ---
-  const handleLeaveMatch = () => {
-    socket.emit('leaveRoom', { roomId });
-    setGameMode('pvp-lobby');
-    setRoomId('');
-    setGameMessage('');
-  };
+  const handleLeaveMatch = () => { socket.emit('leaveRoom', { roomId }); setGameMode('pvp-lobby'); setRoomId(''); setGameMessage(''); setIsTimerRunning(false); };
 
+  // --- UseEffect Hooks ---
   useEffect(() => { startNewGame(); }, [startNewGame]);
 
+  useEffect(() => {
+    let interval;
+    if (isTimerRunning) {
+      interval = setInterval(() => {
+        setTime(prevTime => prevTime + 1);
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [isTimerRunning]);
+  
   useEffect(() => {
     function onRoomCreated({ roomId }) { setRoomId(roomId); setGameMessage(`Room ${roomId} created. Waiting for opponent...`); }
     function onGameStart({ puzzle, initialPuzzle, roomId }) { setRoomId(roomId); setOpponentPuzzle(initialPuzzle); startNewGame(puzzle); setGameMode('pvp-game'); }
     function onOpponentMove(puzzleState) { setOpponentPuzzle(puzzleState); }
-    function onOpponentWon() { setGameMessage('You Lost! Better luck next time.'); }
-    function onOpponentLeft() { setGameMessage('Your opponent left the game.'); }
+    function onOpponentWon() { setGameMessage('You Lost! Better luck next time.'); setIsTimerRunning(false); }
+    function onOpponentLeft() { setGameMessage('Your opponent left the game.'); setIsTimerRunning(false); }
     function onError({ message }) { alert(message); setGameMessage(''); }
     socket.on('roomCreated', onRoomCreated); socket.on('gameStart', onGameStart); socket.on('opponentMove', onOpponentMove); socket.on('opponentWon', onOpponentWon); socket.on('opponentLeft', onOpponentLeft); socket.on('error', onError);
     return () => { socket.off('roomCreated', onRoomCreated); socket.off('gameStart', onGameStart); socket.off('opponentMove', onOpponentMove); socket.off('opponentWon', onOpponentWon); socket.off('opponentLeft', onOpponentLeft); socket.off('error', onError); };
@@ -139,31 +147,31 @@ function App() {
   }, [selectedCell, handleNumberInput, handleErase, gameMessage]);
 
   const getCellClassName = (p, ip, sc, m, index) => { let c = 'cell'; if(ip[index]!==null) c+=' readonly'; if(sc===index) c+=' active'; if(m.includes(index)) c+=' error'; if(sc!==null){ const sr=Math.floor(sc/9), sc_c=sc%9, sb=Math.floor(sr/3)*3+Math.floor(sc_c/3), cr=Math.floor(index/9), cc=index%9, cb=Math.floor(cr/3)*3+Math.floor(cc/3); if(cr===sr||cc===sc_c||cb===sb) c+=' highlight'; } return c; };
-  
-  const renderGrid = (p, ip, sc, m, clickHandler, isOpponent = false) => (
-    <div className="sudoku-grid">
-      {p.map((val, idx) => {
-        const cellValue = isOpponent ? null : val;
-        const className = isOpponent 
-          ? `cell ${val !== null ? 'filled' : ''}` 
-          : getCellClassName(p, ip, sc, m, idx);
-        return ( <div key={idx} className={className} onClick={clickHandler ? () => clickHandler(idx) : null}>{cellValue}</div>);
-      })}
+  const renderGrid = (p, ip, sc, m, clickHandler, isOpponent = false) => ( <div className="sudoku-grid">{p.map((val, idx) => { const cellValue = isOpponent ? null : val; const className = isOpponent ? `cell ${val !== null ? 'filled' : ''}` : getCellClassName(p, ip, sc, m, idx); return ( <div key={idx} className={className} onClick={clickHandler ? () => clickHandler(idx) : null}>{cellValue}</div>); })}</div> );
+
+  const difficultySelector = (
+    <div className="difficulty-selector">
+      <button onClick={() => setDifficulty('easy')} className={difficulty==='easy'?'active':''}>Easy</button>
+      <button onClick={() => setDifficulty('medium')} className={difficulty==='medium'?'active':''}>Medium</button>
+      <button onClick={() => setDifficulty('hard')} className={difficulty==='hard'?'active':''}>Hard</button>
     </div>
   );
 
   return (
     <div className="app-container">
       <div className="header">
-        <h1>Sudoku</h1>
+        <h1>Sudoku Arena</h1>
         <div className="game-mode-selector">
           <button onClick={() => { setGameMode('solo'); startNewGame(); }} className={gameMode==='solo'?'active':''}>Solo</button>
-          <button onClick={() => { setGameMode('pvp-lobby'); setGameMessage(''); setRoomId(''); }} className={gameMode!=='solo'?'active':''}>PvP</button>
+          <button onClick={() => { setGameMode('pvp-lobby'); setGameMessage(''); setRoomId(''); setIsTimerRunning(false); setTime(0);}} className={gameMode!=='solo'?'active':''}>PvP</button>
         </div>
       </div>
+      
+      {gameMode !== 'pvp-lobby' && <div className="timer">{formatTime(time)}</div>}
 
       {gameMode === 'solo' && (
         <div className="game-area">
+          {difficultySelector} {/* Moved selector here */}
           {renderGrid(puzzle, initialPuzzle, selectedCell, mistakes, (idx) => setSelectedCell(idx))}
           <div className="controls">
             <div className="numpad">{[1, 2, 3, 4, 5, 6, 7, 8, 9].map(num => <button key={num} onClick={() => handleNumberInput(num)}>{num}</button>)}</div>
@@ -175,6 +183,7 @@ function App() {
       {gameMode === 'pvp-lobby' && (
         <div className="pvp-lobby">
           <h2>Player vs Player</h2>
+          {difficultySelector} {/* Moved selector here */}
           <button onClick={handleCreateRoom}>Create New Room</button>
           <hr/>
           <input type="text" placeholder="Enter Room ID" value={joinRoomId} onChange={e => setJoinRoomId(e.target.value)} />
@@ -189,12 +198,7 @@ function App() {
             {renderGrid(puzzle, initialPuzzle, selectedCell, mistakes, (idx) => setSelectedCell(idx))}
             <div className="controls">
                 <div className="numpad">{[1, 2, 3, 4, 5, 6, 7, 8, 9].map(num => <button key={num} onClick={() => handleNumberInput(num)}>{num}</button>)}</div>
-                {/* --- NEW: Actions menu for PvP --- */}
-                <div className="actions">
-                    <button onClick={handleUndo}>Undo</button>
-                    <button onClick={handleErase}>Erase</button>
-                    <button onClick={handleLeaveMatch} className="leave-btn">Leave Match</button>
-                </div>
+                <div className="actions"><button onClick={handleUndo}>Undo</button><button onClick={handleErase}>Erase</button><button onClick={handleLeaveMatch} className="leave-btn">Leave Match</button></div>
             </div>
           </div>
           <div className="opponent-grid">
